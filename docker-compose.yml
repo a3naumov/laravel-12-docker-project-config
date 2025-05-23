@@ -1,0 +1,79 @@
+services:
+  nginx:
+    container_name: ${COMPOSE_PROJECT_NAME}-nginx
+    image: nginx:1.27.3-alpine3.20
+    environment:
+      DOMAIN_NAME: "${DOMAIN_NAME}"
+    ports:
+      - ${NGINX_PORT:-8080}:80
+      - ${NGINX_PORT_SSL:-443}:443
+    volumes:
+      - type: bind
+        source: ./docker/nginx/templates
+        target: /etc/nginx/templates
+      - type: bind
+        source: ./docker/nginx/certs
+        target: /etc/nginx/certs
+      - type: bind
+        source: ./src
+        target: /var/www/src
+    working_dir: /var/www/src
+    restart: always
+    networks:
+      - backend-network
+  php:
+    container_name: ${COMPOSE_PROJECT_NAME}-php
+    build:
+      context: ./docker/php
+      args:
+        PHP_INI_FILENAME: ${PHP_INI_FILENAME}
+        USER_NAME: ${PHP_USER_NAME}
+        USER_ID: ${PHP_USER_ID}
+        GROUP_ID: ${PHP_GROUP_ID}
+    image: ${COMPOSE_PROJECT_NAME}-php
+    environment:
+      PHP_IDE_CONFIG: "serverName=${IDE_CONFIG_SERVER_NAME}"
+    volumes:
+      - type: bind
+        source: ./src
+        target: /var/www/src
+    working_dir: /var/www/src
+    restart: always
+    networks:
+      - backend-network
+  mysql:
+    container_name: ${COMPOSE_PROJECT_NAME}-mysql
+    image: mysql:8.0.42
+    environment:
+        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - ${MYSQL_PORT:-3306}:3306
+    volumes:
+      - type: volume
+        source: mysql-data
+        target: /var/lib/mysql
+    restart: always
+    networks:
+      - backend-network
+  node:
+    container_name: ${COMPOSE_PROJECT_NAME}-node
+    image: node:22.16.0-alpine3.21
+    working_dir: /var/www/src
+    volumes:
+      - type: bind
+        source: ./src
+        target: /var/www/src
+    tty: true
+    networks:
+      - backend-network
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  backend-network:
+    driver: bridge
